@@ -202,6 +202,21 @@ sub _populate_obj_to_backup {
             },
             'order' => 510,
             };
+
+        # And Filter.
+        unshift @object_hashes,
+            {
+            $class => {
+                terms => undef,
+                args  => {
+                    'join' => [
+                        MT->model('filter'), 'author_id',
+                        { blog_id => $blog_ids }, { unique => 1 }
+                    ]
+                }
+            },
+            'order' => 500
+            };
     }
     @object_hashes = sort { $a->{order} <=> $b->{order} } @object_hashes;
     my @obj_to_backup;
@@ -317,7 +332,22 @@ sub _loop_through_objects {
     my %authors_seen;
     my %backuped_objs_store;
     my $author_pkg = MT->model('author');
+
+    my $can_read_disk_usage;
+    eval "require Filesys::DfPortable;";
+    if ( !$@ ) {
+        $can_read_disk_usage = 1;
+    }
+
     for my $class_hash (@$obj_to_backup) {
+        if ($can_read_disk_usage) {
+            my $ref = Filesys::DfPortable::dfportable(
+                MT->instance->config('TempDir') );
+            if ( $ref->{per} == 100 ) {
+                die MT->translate( "\nCannot write a file: Disk full" );
+            }
+        }
+
         my ( $class, $term_arg ) = each(%$class_hash);
         eval "require $class;";
         my $children = $class->properties->{child_classes} || {};
@@ -338,10 +368,10 @@ sub _loop_through_objects {
         my $records = 0;
         my $state = MT->translate( 'Backing up [_1] records:', $class );
         $progress->( $state, $class->class_type || $class->datasource );
-        my $limit  = 50;
-        my $offset = 0;
-        my $terms  = $term_arg->{terms} || {};
-        my $args   = $term_arg->{args};
+        my $limit         = 50;
+        my $offset        = 0;
+        my $terms         = $term_arg->{terms} || {};
+        my $args          = $term_arg->{args};
         my $backuped_objs = ( $backuped_objs_store{$class} ||= [] );
 
         unless ( exists $args->{sort} ) {
@@ -710,6 +740,20 @@ sub cb_restore_objects {
     my %assets;
     my %old_ids;
     for my $key ( keys %$all_objects ) {
+        my $obj = $all_objects->{$key};
+        if ( $obj->properties->{audit} ) {
+            my $author_class = MT->model('author');
+            if ( $obj->created_by && $all_objects->{"$author_class#" . $obj->created_by} ) {
+                my $new_id = $all_objects->{"$author_class#" . $obj->created_by}->id;
+                $obj->created_by( $new_id );
+            }
+            if ( $obj->modified_by && $all_objects->{"$author_class#" . $obj->modified_by}) {
+                my $new_id = $all_objects->{"$author_class#" . $obj->modified_by}->id;
+                $obj->modified_by( $new_id );
+            }
+            $obj->save;
+        }
+
         if ( $key =~ /^MT::Entry#(\d+)$/ ) {
             my $new_id = $all_objects->{$key}->id;
             $entries{$new_id} = $all_objects->{$key};
@@ -763,6 +807,19 @@ sub cb_restore_objects {
 
             # call trigger to save meta
             $new_author->call_trigger( 'post_save', $new_author );
+        }
+        elsif ( $key =~ /^MT::(?:Blog|Website)#(\d+)$/ ) {
+            my $blog = $all_objects->{$key};
+            if (my $cat_order = $blog->category_order) {
+                my @cats = split ',', $cat_order;
+                my @new_cats = 
+                    map $_->id, 
+                    grep defined $_, 
+                    map $all_objects->{'MT::Category#'.$_},
+                    @cats;
+                $blog->category_order(join ',', @new_cats);
+                $blog->save;
+            }
         }
     }
 
@@ -1024,7 +1081,7 @@ sub to_xml {
                 next;
             }
             $xml .= " $name='"
-                . MT::Util::encode_xml( $obj->column($name), 1 ) . "'";
+                . MT::Util::encode_xml( $obj->column($name), 1, 1 ) . "'";
         }
     }
     my ( @meta_elements, @meta_blobs );
@@ -1042,13 +1099,13 @@ sub to_xml {
                 }
                 else {
                     $xml .= " $name='"
-                        . MT::Util::encode_xml( $obj->$name, 1 ) . "'";
+                        . MT::Util::encode_xml( $obj->$name, 1, 1 ) . "'";
                 }
             }
         }
     }
     $xml .= '>';
-    $xml .= "<$_>" . MT::Util::encode_xml( $obj->column($_), 1 ) . "</$_>"
+    $xml .= "<$_>" . MT::Util::encode_xml( $obj->column($_), 1, 1 ) . "</$_>"
         foreach @elements;
     require MIME::Base64;
     foreach my $blob_col (@blobs) {
@@ -1073,7 +1130,7 @@ sub to_xml {
             MT::Serialize->serialize( \$hashref ), '' )
             . "</$meta_col>";
     }
-    $xml .= "<$_>" . MT::Util::encode_xml( $obj->$_, 1 ) . "</$_>"
+    $xml .= "<$_>" . MT::Util::encode_xml( $obj->$_, 1, 1 ) . "</$_>"
         foreach @meta_elements;
     foreach my $vblob_col (@meta_blobs) {
         my $vblob = $obj->$vblob_col;

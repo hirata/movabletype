@@ -46,11 +46,8 @@ sub system_check {
     $param{server_modperl} = 1 if $ENV{MOD_PERL};
     $param{server_fastcgi} = 1 if $ENV{FAST_CGI};
 
-    # just check this instance is running on PSGI servers.
-    $param{server_psgi} = $ENV{'psgi.version'} ? 1 : 0;
-    if ( !$param{server_psgi} ) {
-        $param{syscheck_html} = get_syscheck_content($app) || '';
-    }
+    $param{server_psgi}   = $ENV{'psgi.version'} ? 1 : 0;
+    $param{syscheck_html} = get_syscheck_content($app) || '';
 
     $app->load_tmpl( 'system_check.tmpl', \%param );
 }
@@ -1294,9 +1291,17 @@ sub backup {
         backup_what    => join( ',', @blog_ids ),
         schema_version => $app->config('SchemaVersion'),
     };
-    MT::BackupRestore->backup( \@blog_ids, $printer, $splitter, $finisher,
-        $progress, $size * 1024,
-        $enc, $metadata );
+    eval {
+        MT::BackupRestore->backup( \@blog_ids, $printer, $splitter, $finisher,
+            $progress, $size * 1024,
+            $enc, $metadata );
+    };
+    if ( $@ ) {
+        # Abnormal end
+        $param->{error} = $@;
+        close $fh;
+        _backup_finisher( $app, $fname, $param );
+    }
 }
 
 sub backup_download {
@@ -2664,7 +2669,8 @@ sub _backup_finisher {
         $fnames = [$fnames];
     }
     $param->{filename}       = $fnames->[0];
-    $param->{backup_success} = 1;
+    $param->{backup_success} = 1
+        unless $param->{error};
     require MT::Session;
     MT::Session->remove( { kind => 'BU' } );
     foreach my $fname (@$fnames) {
@@ -2745,7 +2751,7 @@ sub _log_dirty_restore {
                 level    => MT::Log::WARNING(),
                 class    => 'system',
                 category => 'restore',
-                metadata => join( ', ', @$ids ),
+                metadata => 'ID:' . join( ', ', @$ids ),
             }
         );
     }

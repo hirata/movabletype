@@ -35,13 +35,19 @@ $.extend(MT.Editor, {
     },
 
     formats: function() {
-        if (this.isMobileOSWYSIWYGSupported() ||
-            ! navigator.userAgent.match(/Android|i(Phone|Pad|Pod)/)
+        return ['wysiwyg', 'source'];
+    },
+
+    formatsForCurrentContext: function() {
+        if (! this.isMobileOSWYSIWYGSupported() &&
+            navigator.userAgent.match(/Android|i(Phone|Pad|Pod)/)
         ) {
-            return ['wysiwyg', 'source'];
+            return $.grep(this.formats(), function(format) {
+                return format != 'wysiwyg';
+            });
         }
         else {
-            return ['source'];
+            return this.formats();
         }
     },
 
@@ -122,6 +128,10 @@ $.extend(MT.Editor.prototype, {
         // Should be overridden.
     },
 
+    setFormat: function() {
+        // Should be overridden, if needed.
+    },
+
     domUpdated: function() {
         // Should be overridden, if needed.
     }
@@ -129,7 +139,7 @@ $.extend(MT.Editor.prototype, {
 
 // Delegate
 $.each([
-    'show', 'hide', 'focus', 'setFormat', 'save',
+    'show', 'hide', 'focus', 'save',
     'getContent', 'setContent', 'insertContent',
     'getHeight', 'setHeight', 'resetUndo'
 ], function() {

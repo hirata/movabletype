@@ -30,6 +30,28 @@ class MTViewer extends Smarty {
         'mtauthorhasentry' => 1,
         'mtauthorhaspage' => 1,
         'mtwebsitehasblog' => 1,
+        'mtarchivelistfooter' => 1,
+        'mtarchivelistheader' => 1,
+        'mtassetisfirstinrow' => 1,
+        'mtassetislastinrow' => 1,
+        'mtassetsfooter' => 1,
+        'mtassetsheader' => 1,
+        'mtcalendarweekfooter' => 1,
+        'mtcalendarweekheader' => 1,
+        'mtcommentsfooter' => 1,
+        'mtcommentsheader' => 1,
+        'mtdatefooter' => 1,
+        'mtdateheader' => 1,
+        'mtentriesfooter' => 1,
+        'mtentriesheader' => 1,
+        'mthasnoparentcategory' => 1,
+        'mthasnosubcategories' => 1,
+        'mthasparentcategory' => 1,
+        'mthassubcategories' => 1,
+        'mtpingsfooter' => 1,
+        'mtpingsheader' => 1,
+        'mtsubcatisfirst' => 1,
+        'mtsubcatislast' => 1,
     );
     var $sanitized = array(
         'mtcommentauthor' => 1,
@@ -699,16 +721,29 @@ EOT;
             }
             if ($hdlr) {
                 if ($block_tag) {
+                    // block tag is true if it runs atleast one iteration
+                    // So we call it twice - one for init, and one iteration
+                    // If the tag still not finished, we clean whatever 
+                    // it localized from the stash
                     $this->_tag_stack[] = array("mt$tag", $args);
+                    $old_varstack =& $this->varstack;
+                    $new_varstack = array();
+                    $this->varstack =& $new_varstack;
                     $repeat = true;
                     $hdlr($args, NULL, $this, $repeat);
                     if ($repeat) {
                         $content = 'true';
-                        $content = $hdlr($args, $content, $this, $repeat = false);
+                        $repeat = false;
+                        $content = $hdlr($args, $content, $this, $repeat);
                         $result = isset($content) && ($content === 'true');
-                    } else {
+                    }
+                    else {
                         $result = false;
                     }
+                    if ($repeat && count($new_varstack)) {
+                        $this->restore(array_keys($new_varstack));
+                    }
+                    $this->varstack =& $old_varstack;
                     array_pop($this->_tag_stack);
                     return $result;
                 }

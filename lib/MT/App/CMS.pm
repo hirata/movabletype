@@ -1385,9 +1385,6 @@ sub core_list_actions {
                 permit_action => 'clone_blog',
                 max           => 1,
                 dialog        => 1,
-                condition     => sub {
-                    return $app->blog ? 1 : 0;
-                },
             },
             'delete' => {
                 label         => 'Delete',
@@ -2960,6 +2957,7 @@ sub set_default_tmpl_params {
     $param->{"auth_mode_$pref"} = 1;
     $param->{mt_news}           = $app->config('NewsURL');
     $param->{mt_support}        = $app->config('SupportURL');
+    $param->{mt_feedback_url}   = $app->config('FeedbackURL');
     my $lang = lc MT->current_language || 'en_us';
     $param->{language_id} = ( $lang !~ /en[_-]us/ ) ? $lang : '';
     $param->{mode} = $app->mode;
@@ -3982,6 +3980,14 @@ sub load_default_entry_prefs {
 
     if ( $perm && $perm->entry_prefs ) {
         $prefs = $perm->entry_prefs;
+        if ($prefs !~ m/\b(?:default|basic|custom|advanced)\b/i) {
+            if ($prefs !~ m/\btitle\b/) {
+                $prefs = 'title,'.$prefs;
+            }
+            if ($prefs !~ m/\btext\b/) {
+                $prefs =~ s/\btitle\b/title,text/;
+            }
+        }
     }
     else {
         if ( lc( $default{type} ) eq 'custom' ) {
@@ -4026,6 +4032,14 @@ sub load_default_page_prefs {
 
     if ( $perm && $perm->page_prefs ) {
         $prefs = $perm->page_prefs;
+        if ($prefs !~ m/\b(?:default|basic|custom|advanced)\b/i) {
+            if ($prefs !~ m/\btitle\b/) {
+                $prefs = 'title,'.$prefs;
+            }
+            if ($prefs !~ m/\btext\b/) {
+                $prefs =~ s/\btitle\b/title,text/;
+            }
+        }
     }
     else {
         if ( lc( $default{type} ) eq 'custom' ) {
@@ -4082,36 +4096,27 @@ sub _parse_entry_prefs {
     my ( $prefix, $prefs, $param, $fields ) = @_;
     my @p = split /,/, $prefs;
     for my $p (@p) {
-        if ( $p =~ m/^(.+?):(\d+)$/ ) {
-            my ( $name, $num ) = ( $1, $2 );
-            if ($num) {
-                $param->{ 'disp_prefs_height_' . $name } = $num;
+        my ($name, $ext) = $p =~ m/^(.+?):(.+)$/;
+        $p = $name if (defined $ext);
+
+        if ( $ext and ( $ext =~ m/^(\d+)$/ )  ) {
+            $param->{ 'disp_prefs_height_' . $p } = $ext;
+        }
+        if ( grep { lc($p) eq $_ } qw{advanced default basic} ) {
+            $p = 'Default' if lc($p) eq 'basic';
+            $param->{ $prefix . 'disp_prefs_' . $p } = 1;
+            my @fields = qw( title body category tags feedback publishing assets );
+            if ( lc($p) eq 'advanced' ) {
+                push @fields, qw(excerpt feedback keywords);
             }
-            $param->{ $prefix . 'disp_prefs_show_' . $name } = 1;
-            push @$fields, { name => $name };
+            foreach my $def ( @fields ) {
+                $param->{ $prefix . 'disp_prefs_show_' . $def } = 1;
+                push @$fields, { name => $def };
+            }
         }
         else {
-            $p = 'Default' if lc($p) eq 'basic';
-            if ( ( lc($p) eq 'advanced' ) || ( lc($p) eq 'default' ) ) {
-                $param->{ $prefix . 'disp_prefs_' . $p } = 1;
-                foreach my $def (
-                    qw( title body category tags feedback publishing assets )
-                    )
-                {
-                    $param->{ $prefix . 'disp_prefs_show_' . $def } = 1;
-                    push @$fields, { name => $def };
-                }
-                if ( lc($p) eq 'advanced' ) {
-                    foreach my $def (qw(excerpt feedback keywords)) {
-                        $param->{ $prefix . 'disp_prefs_show_' . $def } = 1;
-                        push @$fields, { name => $def };
-                    }
-                }
-            }
-            else {
-                $param->{ $prefix . 'disp_prefs_show_' . $p } = 1;
-                push @$fields, { name => $p };
-            }
+            $param->{ $prefix . 'disp_prefs_show_' . $p } = 1;
+            push @$fields, { name => $p };
         }
     }
 }
@@ -4469,33 +4474,22 @@ sub _entry_prefs_from_params {
     my $app      = shift;
     my ($prefix) = @_;
     my $q        = $app->param;
-    my $disp     = $q->param('entry_prefs');
-    my %fields;
-    my $prefs = '';
-    if ( $disp && lc $disp ne 'custom' ) {
-        $fields{$disp} = 1;
+    my $disp     = $q->param('entry_prefs') || '';
+    my @fields;
+    if ( lc $disp eq 'custom' ) {
+        @fields = split /,/, $q->param( $prefix . 'custom_prefs' );
     }
-    elsif ( $disp && lc $disp eq 'custom' ) {
-        my @fields = split /,/, $q->param( $prefix . 'custom_prefs' );
-        foreach (@fields) {
-            $prefs .= ',' if $prefs ne '';
-            $prefs .= $_;
-        }
+    elsif ( $disp ) {
+        push @fields, $disp;
     }
     else {
-        $fields{$_} = 1 foreach $q->param( $prefix . 'custom_prefs' );
+        @fields = $q->param( $prefix . 'custom_prefs' );
     }
 
     if ( my $body_height = $q->param('text_height') ) {
-        $fields{'body'} = $body_height;
+        push @fields, 'body:'.$body_height;
     }
-    foreach ( keys %fields ) {
-        $prefs .= ',' if $prefs ne '';
-        $prefs .= $_;
-        $prefs .= ':' . $fields{$_} if $fields{$_} > 1;
-    }
-    $prefs .= '|' . $q->param('bar_position');
-    $prefs;
+    return join(',', @fields) . '|' . $q->param('bar_position');
 }
 
 # rebuild_set is a hash whose keys are entry IDs
@@ -4989,10 +4983,12 @@ sub setup_editor_param {
                 my $tmpls  = $param->{editors}{$editor_key} ||= {
                     templates  => [],
                     extensions => [],
+                    config     => {},
                 };
 
                 foreach my $k ( 'template', 'extension' ) {
                     my $conf = $reg->{$k};
+                    next unless defined $conf;
                     if ( !ref $conf ) {
                         $conf = {
                             template => $conf,
@@ -5008,6 +5004,10 @@ sub setup_editor_param {
                         );
                     }
                 }
+
+                $tmpls->{config}
+                    = { %{ $tmpls->{config} }, %{ $reg->{'config'} } }
+                    if $reg->{'config'};
             }
         }
 

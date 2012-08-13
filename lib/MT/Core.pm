@@ -1779,6 +1779,10 @@ BEGIN {
                 default =>
                     'http://www.sixapart.com/movabletype/news/mt4_news_widget.html',
             },
+            'FeedbackURL' => {
+                default =>
+                    'http://www.movabletype.org/feedback.html',
+            },
 
 # 'MTNewsURL' => {
 #     default => 'http://www.sixapart.com/movabletype/news/mt4_news_widget.html',
@@ -1838,7 +1842,7 @@ BEGIN {
             },
             'DeleteFilesAtRebuild'      => { default => 1, },
             'RebuildAtDelete'           => { default => 1, },
-            'MaxTagAutoCompletionItems' => { default => 1000, },
+            'MaxTagAutoCompletionItems' => { default => 1000, },    ## DEPRECATED
             'NewUserAutoProvisioning' =>
                 { handler => \&NewUserAutoProvisioning, },
             'NewUserBlogTheme'        => { default => 'classic_blog' },
@@ -1963,6 +1967,10 @@ BEGIN {
                 handler => 'MT::App::Wizard',
                 script  => sub { 'mt-wizard.cgi' },
                 type    => 'run_once',
+            },
+            'check' => {
+                script => sub { MT->config->CheckScript },
+                type   => 'run_once',
             },
             'comments' => {
                 handler => 'MT::App::Comments',

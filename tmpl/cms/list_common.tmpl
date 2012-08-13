@@ -533,7 +533,7 @@ function openFilterRenameField() {
         $handle.find('.cancel').click();
         return false;
     }
-    if ( !jQuery('#filter_' + fid).mtValidate('dialog') )
+    if ( !jQuery('#filter_' + fid).mtValidate('simple') )
         return false;
     $this.parents('.filter').find('.item-ctrl').hide();
     $this.parents('.filter').find('input').hide().after( jQuery('<span class="indicator"><img alt="<__trans phrase="Loading..." escape="js">" src="<mt:var name="static_uri">images/indicator.white.gif" /></span>') );
@@ -1283,7 +1283,7 @@ function resetFilterDetails() {
 }
 
 jQuery('#apply').click(function() {
-  validateFilterDetails();
+  if (!validateFilterDetails()) return false;
   jQuery('input[name=filter_id]').val('');
   itemValues()
   renderList('filtered_list', cols, vals, jQuery('#row').val(), 1);
@@ -1296,7 +1296,7 @@ jQuery('#<mt:var name="object_type">-listing-form').bind('submit.as_apply', func
 });
 
 jQuery('#save').click(function() {
-  validateFilterDetails();
+  if (!validateFilterDetails()) return false;
   if (jQuery('#filter_id').val() && jQuery('#filter_id').val().match(/^[1-9][0-9]*$/) ) {
     // Overwrite current filter.
     jQuery('input[name=filter_name]').val(jQuery('#filter_name').val());
@@ -1331,7 +1331,7 @@ jQuery('#save').click(function() {
 });
 
 jQuery('#saveas').click(function() {
-  validateFilterDetails();
+  if (!validateFilterDetails()) return false;
   jQuery('input[name=filter_name]').mtUnvalidate().val(jQuery('#opener').text());
   jQuery('input[name=filter_id]').val('');
   jQuery('#dialog_save_filter')
@@ -1374,7 +1374,7 @@ jQuery('#dialog_save_filter form').submit(function() {
 });
 
 jQuery('#save-filter').click(function() {
-  if ( !jQuery('input[name=filter_name]').mtValidate('dialog') )
+  if ( !jQuery('input[name=filter_name]').mtValidate('simple') )
     return false;
   var name = jQuery('input[name=filter_name]').val();
   itemValues();

@@ -21,7 +21,7 @@ $.extend(MT.EditorManager, {
         var thisConstructor = this;
 
         this.editors[id] = editor;
-        $.each(editor.formats(), function() {
+        $.each(editor.formatsForCurrentContext(), function() {
             if (! thisConstructor.editorsForFormat[this]) {
                 thisConstructor.editorsForFormat[this] = [];
             }
@@ -136,10 +136,13 @@ $.extend(MT.EditorManager.prototype, {
         }
         else {
             var content = this.currentEditor.getContent();
+            var height  = this.currentEditor.getHeight();
+
             this.currentEditor.hide();
             this.currentEditor = editor;
             this.currentEditor.initOrShow(format);
             this.currentEditor.setContent(content);
+            this.currentEditor.setHeight(height);
         }
     },
 

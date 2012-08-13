@@ -165,8 +165,7 @@ function validate (f) {
       <li><input type="radio" name="trackback_send" id="trackback_send_off" value="off"<mt:if name="trackback_send_off"> checked="checked"</mt:if> /> <label for="trackback_send_off"><__trans phrase="Disabled"></label> <span class="hint"><__trans phrase="(No Outbound TrackBacks)"></span></li>
       <li><input type="radio" name="trackback_send" id="trackback_send_local" value="local"<mt:if name="trackback_send_local"> checked="checked"</mt:if> /> <label for="trackback_send_local"><__trans phrase="Only to blogs within this system"></label></li>
       <li>
-        <input type="radio" name="trackback_send" id="trackback-send-selected" value="selected"<mt:if name="trackback_send_selected"> checked="checked"</mt:if> /> <label for="trackback_send_selected"><__trans phrase="Only to websites on the following domains:"></label><br />
-        <textarea name="trackback_send_domains" class="text low"><mt:var name="trackback_send_domains" escape="html"></textarea>
+        <input type="radio" name="trackback_send" id="trackback-send-selected" value="selected"<mt:if name="trackback_send_selected"> checked="checked"</mt:if> /> <label for="trackback_send_selected"><__trans phrase="Only to websites on the following domains:"><br /><textarea name="trackback_send_domains" class="text low"><mt:var name="trackback_send_domains" escape="html"></textarea></label>
       </li>
     </ul>
   </mtapp:setting>
@@ -265,7 +264,7 @@ function validate (f) {
         bgiframe: true,
         title: '<__trans phrase="Send Test Mail">',
         autoOpen: false,
-        width: 450,
+        width: 450
     });
 
     jQuery('#send-test-email').click(function() {
@@ -323,11 +322,11 @@ function validate (f) {
         '.absolute-site_path': function ($e) {
             if ($e.val().length == 0) return 1;
             return is_valid_absolute_path($e.val());
-        },
+        }
     });
 
     jQuery.mtValidateAddMessages({
-        '.absolute-site_path': '<__trans phrase="You must set a valid Local Archive Path." escape="singlequotes">',
+        '.absolute-site_path': '<__trans phrase="You must set a valid absolute Path." escape="singlequotes">'
     });
     jQuery('#sys_conf').submit( function () {
         if ( !jQuery(this).find('input:not(:disabled), select:not(:disabled)').filter('input:visible, select:visible').mtValidate('simple') ) return false;
